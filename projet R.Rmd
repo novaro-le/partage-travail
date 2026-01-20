@@ -1,0 +1,179 @@
+---
+title: "Prédiction du diabète"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  word_document: default
+---
+Présentation de la base de données (Diabetes Dataset)
+La base de données contient des informations médicales de patients, notamment :
+•	Pregnancies : nombre de grossesses
+•	Glucose : taux de glucose
+•	BloodPressure : pression artérielle
+•	SkinThickness : épaisseur du pli cutané
+•	Insulin : taux d’insuline
+•	BMI : indice de masse corporelle
+•	Age : âge du patient
+•	Outcome :
+o	0 → non diabétique
+o	1 → diabétique
+
+1- Importation des bibliothèques
+
+```{r}
+# Nettoyer l'environnement
+rm(list = ls())
+
+# Installer les packages si nécessaire
+# install.packages(c("tidyverse", "caret", "corrplot"))
+
+# Charger les bibliothèques
+library(tidyverse)   # manipulation + visualisation
+library(caret)       # séparation train/test + modèle
+library(corrplot)    # matrice de corrélation
+
+```
+2- Importation du dataset
+```{r}
+# Importation du dataset
+diabetes <- read.csv("diabetes.csv")
+
+# Aperçu des premières lignes
+head(diabetes)
+
+# Dimensions du dataset
+dim(diabetes)
+
+# Structure des données
+str(diabetes)
+
+```
+3- Nettoyage des données
+```{r}
+# Vérification des valeurs manquantes
+colSums(is.na(diabetes))
+
+```
+Remplacement des zéros par NA
+```{r}
+# Colonnes concernées
+cols_zero <- c("Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI")
+
+# Remplacer les 0 par NA
+diabetes[cols_zero] <- lapply(diabetes[cols_zero], function(x) {
+  ifelse(x == 0, NA, x)
+})
+
+# Vérifier à nouveau
+colSums(is.na(diabetes))
+
+```
+Suppression des lignes contenant des NA
+```{r}
+# Supprimer les lignes incomplètes
+diabetes <- na.omit(diabetes)
+
+# Vérifier la nouvelle taille
+dim(diabetes)
+
+```
+4- Analyse statistique descriptive
+```{r}
+# Statistiques descriptives
+summary(diabetes)
+
+# Moyennes par groupe (diabétique / non diabétique)
+aggregate(. ~ Outcome, data = diabetes, mean)
+
+```
+5- Visualisation des données
+```{r}
+ggplot(diabetes, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  labs(title = "Distribution de l'âge", x = "Âge", y = "Effectif")
+
+```
+Boxplot Glucose vs Diabète
+```{r}
+ggplot(diabetes, aes(x = factor(Outcome), y = Glucose, fill = factor(Outcome))) +
+  geom_boxplot() +
+  labs(title = "Glucose selon le diabète",
+       x = "Diabète (0 = Non, 1 = Oui)",
+       y = "Glucose")
+
+```
+Matrice de corrélation
+```{r}
+# Calcul de la corrélation
+cor_matrix <- cor(diabetes)
+
+# Affichage graphique
+corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.7)
+
+```
+6- Séparation des données (Train / Test)
+```{r}
+set.seed(123)  # reproductibilité
+
+# Index de séparation (70% entraînement, 30% test)
+index <- createDataPartition(diabetes$Outcome, p = 0.7, list = FALSE)
+
+train <- diabetes[index, ]
+test  <- diabetes[-index, ]
+
+```
+7- Entraînement du modèle (Régression Logistique)
+```{r}
+# Entraînement du modèle
+model_logit <- glm(Outcome ~ Glucose + BMI + Age + BloodPressure,
+                   data = train,
+                   family = binomial)
+
+
+
+# Résumé du modèle
+summary(model_logit)
+
+saveRDS(model_logit, "modele_diabete.rds")
+
+```
+8- Prédiction sur les données test
+```{r}
+# Probabilités prédites
+pred_prob <- predict(model_logit, test, type = "response")
+
+# Conversion en classes (seuil = 0.5)
+pred_class <- ifelse(pred_prob >= 0.5, 1, 0)
+
+# Conversion en facteur
+pred_class <- factor(pred_class)
+test$Outcome <- factor(test$Outcome)
+
+```
+9- Évaluation du modèle
+```{r}
+# Matrice de confusion
+confusionMatrix(pred_class, test$Outcome)
+
+```
+10- Conclusion 
+Cette étude montre que le glucose, l’indice de masse corporelle et l’âge sont des facteurs déterminants du diabète. Le modèle de régression logistique construit permet de prédire la présence du diabète avec une précision d’environ 78 %, ce qui est satisfaisant pour un modèle simple.
+```{r}
+file.exists("modele_diabete.rds")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
